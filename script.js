@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", function () {
     dbRequest.onsuccess = function (event) {
         db = event.target.result;
         console.log("IndexedDB opened successfully");
-        renderMemories(); // ✅ NOW SAFE TO CALL AFTER DB OPENS
+        renderMemories();
     };
 
     dbRequest.onerror = function () {
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 let overlaps = false;
 
                 do {
-                    randomX = Math.random() * 70;
+                    randomX = Math.random() * 90;
                     randomY = Math.random() * 50;
 
                     overlaps = placedPositions.some(pos =>

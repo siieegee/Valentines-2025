@@ -17,7 +17,8 @@ body {
 
 /* Container */
 .container {
-    max-width: 600px;
+    width: 100vw; 
+    max-width: 100%;
     margin: auto;
     padding: 20px;
 }
@@ -39,6 +40,7 @@ h1 {
 .grid {
     position: relative;
     width: 100%;
+    max-width: 100%;
     height: 500px; /* Adjust height as needed */
     overflow: hidden;
 }
@@ -58,6 +60,7 @@ h1 {
     flex-direction: column;
     align-items: center;
     transition: transform 0.2s;
+    margin: 20px;
 }
 
 /* Memory Title */
