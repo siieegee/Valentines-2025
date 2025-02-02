@@ -9,92 +9,136 @@ document.addEventListener("DOMContentLoaded", function () {
     const memoryText = document.getElementById("memoryText");
     const memoryImage = document.getElementById("memoryImage");
 
-    let memories = JSON.parse(localStorage.getItem("memories")) || [];
+    let db;
+
+    const dbRequest = indexedDB.open("MemoryDB", 1);
+
+    dbRequest.onupgradeneeded = function (event) {
+        db = event.target.result;
+        db.createObjectStore("memories", { keyPath: "id", autoIncrement: true });
+    };
+
+    dbRequest.onsuccess = function (event) {
+        db = event.target.result;
+        console.log("IndexedDB opened successfully");
+        renderMemories(); // ✅ NOW SAFE TO CALL AFTER DB OPENS
+    };
+
+    dbRequest.onerror = function () {
+        console.error("Error opening IndexedDB.");
+    };
 
     function renderMemories() {
+        if (!db) {
+            console.warn("IndexedDB not initialized yet, skipping render.");
+            return;
+        }
+
         memoryGrid.innerHTML = "";
         const placedPositions = [];
 
-        memories.forEach((memory, index) => {
-            const memoryDiv = document.createElement("div");
-            memoryDiv.classList.add("memory-item");
+        const transaction = db.transaction(["memories"], "readonly");
+        const objectStore = transaction.objectStore("memories");
+        const request = objectStore.getAll();
 
-            // Generate a random rotation
-            const randomRotate = Math.random() * 10 - 5; // Between -5° and 5°
+        request.onsuccess = function () {
+            const memories = request.result;
 
-            let randomX, randomY;
-            let attempts = 0;
-            let overlaps = false;
+            memories.forEach((memory) => {
+                const memoryDiv = document.createElement("div");
+                memoryDiv.classList.add("memory-item");
 
-            do {
-                // Generate random positions within a safe range
-                randomX = Math.random() * 70; // Ensures no polaroids go off-screen
-                randomY = Math.random() * 50;
+                const randomRotate = Math.random() * 10 - 5;
+                let randomX, randomY;
+                let attempts = 0;
+                let overlaps = false;
 
-                // Check for overlaps
-                overlaps = placedPositions.some(pos =>
-                    Math.abs(pos.x - randomX) < 15 && Math.abs(pos.y - randomY) < 15
-                );
+                do {
+                    randomX = Math.random() * 70;
+                    randomY = Math.random() * 50;
 
-                attempts++;
-            } while (overlaps && attempts < 50); // Try up to 50 times to find a non-overlapping spot
+                    overlaps = placedPositions.some(pos =>
+                        Math.abs(pos.x - randomX) < 15 && Math.abs(pos.y - randomY) < 15
+                    );
 
-            // Store the position to avoid future overlaps
-            placedPositions.push({ x: randomX, y: randomY });
+                    attempts++;
+                } while (overlaps && attempts < 50);
 
-            // Apply styles
-            memoryDiv.style.transform = `rotate(${randomRotate}deg)`;
-            memoryDiv.style.position = "absolute";
-            memoryDiv.style.left = `${randomX}%`;
-            memoryDiv.style.top = `${randomY}%`;
+                placedPositions.push({ x: randomX, y: randomY });
 
-            // Create delete button
-            const deleteBtn = document.createElement("button");
-            deleteBtn.classList.add("delete-memory");
-            deleteBtn.innerHTML = "❌";
-            deleteBtn.addEventListener("click", (event) => {
-                event.stopPropagation(); // Prevent accidental modal opening
-                memories.splice(index, 1); // Remove selected memory
-                localStorage.setItem("memories", JSON.stringify(memories));
-                renderMemories(); // Refresh memory grid
+                memoryDiv.style.transform = `rotate(${randomRotate}deg)`;
+                memoryDiv.style.position = "absolute";
+                memoryDiv.style.left = `${randomX}%`;
+                memoryDiv.style.top = `${randomY}%`;
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.classList.add("delete-memory");
+                deleteBtn.innerHTML = "❌";
+                deleteBtn.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    deleteFromIndexedDB(memory.id);
+                });
+
+                memoryDiv.innerHTML = `
+                    ${memory.image ? `<img src="${memory.image}" alt="Memory Image">` : ""}
+                    <h3>${memory.title}</h3>
+                    <p>${memory.text}</p>
+                `;
+
+                memoryDiv.appendChild(deleteBtn);
+                memoryGrid.appendChild(memoryDiv);
             });
-
-            // Set inner content
-            memoryDiv.innerHTML = `
-                ${memory.image ? `<img src="${memory.image}" alt="Memory Image">` : ""}
-                <h3>${memory.title}</h3>
-                <p>${memory.text}</p>
-            `;
-
-            // Append delete button to memory div
-            memoryDiv.appendChild(deleteBtn);
-            memoryGrid.appendChild(memoryDiv);
-        });
+        };
     }
 
-    // Ensure the modal does NOT show when the site first loads
+    function saveToIndexedDB(memory) {
+        const transaction = db.transaction(["memories"], "readwrite");
+        const objectStore = transaction.objectStore("memories");
+        const request = objectStore.add(memory);
+
+        request.onsuccess = function () {
+            renderMemories();
+        };
+    }
+
+    function deleteFromIndexedDB(id) {
+        const transaction = db.transaction(["memories"], "readwrite");
+        const objectStore = transaction.objectStore("memories");
+        const request = objectStore.delete(id);
+
+        request.onsuccess = function () {
+            renderMemories();
+        };
+    }
+
+    function clearIndexedDB() {
+        const transaction = db.transaction(["memories"], "readwrite");
+        const objectStore = transaction.objectStore("memories");
+        objectStore.clear();
+
+        transaction.oncomplete = function () {
+            renderMemories();
+        };
+    }
+
     modal.style.display = "none";
 
-    // Open modal when clicking "Add Memory"
     addMemoryBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         modal.style.display = "block";
     });
 
-    // Close modal when clicking the close button
     closeModal.addEventListener("click", (event) => {
         event.stopPropagation();
         modal.style.display = "none";
     });
 
-    // Close modal when clicking outside of it
     window.addEventListener("click", (event) => {
         if (event.target === modal) {
             modal.style.display = "none";
         }
     });
 
-    // ✅ FIX: Save images as Base64 so they persist after exiting the site
     saveMemoryBtn.addEventListener("click", () => {
         const file = memoryImage.files[0];
 
@@ -105,47 +149,34 @@ document.addEventListener("DOMContentLoaded", function () {
                 const newMemory = {
                     title: memoryTitle.value,
                     text: memoryText.value,
-                    image: reader.result // Save Base64 image
+                    image: reader.result
                 };
 
-                memories.push(newMemory);
-                localStorage.setItem("memories", JSON.stringify(memories));
-                renderMemories();
+                saveToIndexedDB(newMemory);
                 modal.style.display = "none";
 
-                // Clear input fields
                 memoryTitle.value = "";
                 memoryText.value = "";
                 memoryImage.value = "";
             };
         } else {
-            // Save text memory without an image
             const newMemory = {
                 title: memoryTitle.value,
                 text: memoryText.value,
                 image: ""
             };
 
-            memories.push(newMemory);
-            localStorage.setItem("memories", JSON.stringify(memories));
-            renderMemories();
+            saveToIndexedDB(newMemory);
             modal.style.display = "none";
 
-            // Clear input fields
             memoryTitle.value = "";
             memoryText.value = "";
         }
     });
 
-    // Clear all memories
     clearMemoriesBtn.addEventListener("click", () => {
         if (confirm("Are you sure you want to delete all memories?")) {
-            localStorage.removeItem("memories");
-            memories = [];
-            renderMemories();
+            clearIndexedDB();
         }
     });
-
-    // Render memories on page load (Fix: No auto-opening modal)
-    renderMemories();
 });
