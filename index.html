@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valentine's Memory Box</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>💖 My Valentine Memory Box 💖</h1>
+        
+        <div class="grid" id="memoryGrid"></div>
+
+        <!-- Add Memory Button -->
+        <button id="addMemory">➕ Add Memory</button>
+
+        <!-- Clear All Memories Button -->
+        <button id="clearMemories">🗑️ Clear All Memories</button>
+    </div>
+    
+    <!-- Modal for Adding Memories -->
+    <div class="modal" id="memoryModal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Add a Memory</h2>
+            <input type="text" id="memoryTitle" placeholder="Title">
+            <textarea id="memoryText" placeholder="Write a love note..."></textarea>
+            <input type="file" id="memoryImage" accept="image/*">
+            <button id="saveMemory">Save</button>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
